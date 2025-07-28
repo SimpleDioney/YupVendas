@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel V6 - YUP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/emoji-button@latest/dist/index.min.js"></script>
+    <style>
+        @keyframes blink {
+            50% {
+                border-color: #ffc107;
+            }
+        }
+
+        .blinking-border {
+            animation: blink 1.5s linear infinite;
+        }
+
+        body {
+            background-color: #121212;
+            color: #e9ecef;
+        }
+
+        .card,
+        .list-group-item,
+        .modal-content {
+            background-color: #212529;
+            border: 1px solid #495057;
+        }
+
+        .table {
+            --bs-table-bg: #212529;
+            --bs-table-striped-bg: #343a40;
+            --bs-table-color: #e9ecef;
+            --bs-table-border-color: #495057;
+        }
+
+        .nav-tabs {
+            border-bottom-color: #495057;
+        }
+
+        .nav-tabs .nav-link {
+            color: #adb5bd;
+            border-color: transparent;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: #f8f9fa;
+            background-color: #212529;
+            border-color: #495057 #495057 #212529;
+        }
+
+        .form-control,
+        .form-select {
+            background-color: #343a40;
+            color: #f8f9fa;
+            border-color: #495057;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background-color: #343a40;
+            color: #f8f9fa;
+            border-color: #ffc107;
+            box-shadow: 0 0 0 .25rem rgba(255, 193, 7, .25);
+        }
+
+        .toast {
+            min-width: 250px;
+        }
+
+        .customer-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .customer-list .list-group-item-action {
+            cursor: pointer;
+            border-color: #495057;
+        }
+
+        .customer-list .list-group-item-action.active {
+            background-color: #ffc107;
+            color: #212529;
+            border-color: #ffc107;
+        }
+
+        .chat-box {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #121212;
+            border: 1px solid #495057;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .chat-message {
+            display: flex;
+            flex-direction: column;
+            max-width: 75%;
+            padding: 8px 12px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            word-wrap: break-word;
+        }
+
+        .chat-message.admin,
+        .chat-message[data-sender-role='admin'] {
+            background-color: #005c4b;
+            color: white;
+            margin-left: auto;
+            align-items: flex-end;
+        }
+
+        .chat-message[data-sender-role='atendente'] {
+            background-color: #005c4b;
+            color: white;
+            margin-left: auto;
+            align-items: flex-end;
+        }
+
+        .chat-message.customer {
+            background-color: #343a40;
+            color: white;
+            margin-right: auto;
+            align-items: flex-start;
+        }
+
+        .chat-message small {
+            font-size: 0.75em;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+        <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header"><strong class="me-auto" id="toast-title"></strong><button type="button"
+                    class="btn-close btn-close-white" data-bs-dismiss="toast"></button></div>
+            <div class="toast-body" id="toast-body"></div>
+        </div>
+    </div>
+
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-warning mb-0"><i class="fa-solid fa-chart-line"></i> Painel de Controle</h1>
+            <div>
+                <span class="navbar-text me-3" id="welcome-user"></span>
+                <button class="btn btn-outline-danger" id="logout-button"><i class="fa-solid fa-right-from-bracket"></i>
+                    Sair</button>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fa-solid fa-dollar-sign"></i> Vendas Totais</h5>
+                        <p class="card-text fs-4" id="total-sales">R$ 0,00</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fa-solid fa-box-archive"></i> Pedidos</h5>
+                        <p class="card-text fs-4" id="order-count">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fa-solid fa-boxes-stacked"></i> Produtos</h5>
+                        <p class="card-text fs-4" id="product-count">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fa-solid fa-users"></i> Clientes</h5>
+                        <p class="card-text fs-4" id="customer-count">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab"
+                    data-bs-target="#messaging-tab-pane" type="button">💬 Chat</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#products-tab-pane" type="button">📦 Produtos</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#orders-tab-pane" type="button">📜 Pedidos</button></li>
+            <li class="nav-item" id="campaigns-tab-li" style="display: none;" role="presentation"><button
+                    class="nav-link" data-bs-toggle="tab" data-bs-target="#campaign-tab-pane">📢 Campanhas</button></li>
+            <li class="nav-item" id="reports-tab-li" style="display: none;" role="presentation"><button class="nav-link"
+                    data-bs-toggle="tab" data-bs-target="#reports-tab-pane">📊 Relatórios</button></li>
+            <li class="nav-item" id="users-tab-li" style="display: none;" role="presentation"><button class="nav-link"
+                    data-bs-toggle="tab" data-bs-target="#users-tab-pane">⚙️ Usuários</button></li>
+        </ul>
+
+        <div class="tab-content" id="myTabContent">
+            <div class="tab-pane fade show active p-3" id="messaging-tab-pane" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h3 class="h5">Clientes</h3><input type="text" id="customer-search-input"
+                            class="form-control mb-2" placeholder="Buscar cliente...">
+                        <div class="list-group customer-list" id="customer-list"></div>
+                    </div>
+                    <div class="col-md-8">
+                        <div id="messaging-area" class="d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded"
+                                style="background-color: #343a40;">
+                                <div>
+                                    <h5 id="chat-customer-name" class="mb-0"></h5><button
+                                        class="btn btn-sm btn-outline-info py-0" onclick="openCustomerModal()"><i
+                                            class="fa-solid fa-pen-to-square"></i> Editar Cliente</button>
+                                </div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox"
+                                        role="switch" id="human-mode-toggle"><label class="form-check-label"
+                                        for="human-mode-toggle" id="human-mode-label"></label></div>
+                            </div>
+                            <div class="chat-box mb-2" id="chat-box"></div>
+                            <form id="send-message-form" class="d-flex gap-2">
+                                <input type="hidden" id="selected-customer-phone">
+                                <button type="button" class="btn btn-outline-secondary" id="emoji-button">😊</button>
+                                <textarea class="form-control" id="message-text" rows="1"
+                                    placeholder="Digite sua mensagem..." required></textarea>
+                                <button type="submit" class="btn btn-warning"><i
+                                        class="fa-solid fa-paper-plane"></i></button>
+                            </form>
+                        </div>
+                        <div id="messaging-placeholder"
+                            class="d-flex align-items-center justify-content-center text-center p-5 border rounded h-100">
+                            <div><i class="fa-solid fa-arrow-left fa-3x mb-3 text-secondary"></i>
+                                <h4>Selecione um cliente na lista para começar</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade p-3" id="products-tab-pane" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Gerenciamento de Produtos</h3>
+                    <button id="add-product-button" class="btn btn-warning" style="display: none;"
+                        onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Novo Produto</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Preço</th>
+                                <th style="width: 200px;">Ajuste de Estoque</th>
+                                <th>Em Estoque</th>
+                                <th id="products-actions-header" style="display: none;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade p-3" id="orders-tab-pane" role="tabpanel">
+                <h3 class="mb-3">Histórico de Vendas</h3>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Valor Total</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade p-3" id="campaign-tab-pane" role="tabpanel">
+                <h3>Criar Campanha</h3>
+                <p class="text-muted">Envie uma única mensagem para múltiplos clientes. <strong>Use com
+                        moderação.</strong></p>
+                <form id="campaign-form">
+                    <div class="mb-3"><label class="form-label">Destinatários</label>
+                        <div class="card p-2" style="max-height: 200px; overflow-y: auto;">
+                            <div id="campaign-customer-list"></div>
+                        </div><button type="button" class="btn btn-sm btn-link mt-1"
+                            onclick="selectAllCustomers(true)">Marcar todos</button><button type="button"
+                            class="btn btn-sm btn-link mt-1" onclick="selectAllCustomers(false)">Desmarcar
+                            todos</button>
+                    </div>
+                    <div class="mb-3"><label for="campaign-message" class="form-label">Mensagem</label><textarea
+                            class="form-control" id="campaign-message" rows="5" required></textarea></div><button
+                        type="submit" class="btn btn-danger"><i class="fa-solid fa-bullhorn"></i> Iniciar Envio</button>
+                </form>
+            </div>
+            <div class="tab-pane fade p-3" id="reports-tab-pane" role="tabpanel">
+                <h3>Relatórios de Desempenho</h3>
+                <div class="row mt-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header fw-bold">🏆 Top 5 Produtos Mais Vendidos</div>
+                            <ul class="list-group list-group-flush" id="top-products-list"></ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header fw-bold">⭐ Top 5 Clientes</div>
+                            <ul class="list-group list-group-flush" id="top-customers-list"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade p-3" id="users-tab-pane" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Gerenciamento de Usuários</h3><button class="btn btn-warning" onclick="openUserModal()"><i
+                            class="fa-solid fa-plus"></i> Novo Usuário</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Usuário (login)</th>
+                                <th>Permissão</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="productModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productModalTitle"></h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="product-form"><input type="hidden" id="product-id">
+                        <div class="mb-3"><label for="product-name" class="form-label">Nome</label><input type="text"
+                                class="form-control" id="product-name" required></div>
+                        <div class="mb-3"><label for="product-price" class="form-label">Preço</label><input
+                                type="number" step="0.01" class="form-control" id="product-price" required></div>
+                        <div id="new-product-fields">
+                            <div class="mb-3"><label for="product-stock" class="form-label">Estoque
+                                    Inicial</label><input type="number" class="form-control" id="product-stock"
+                                    required></div>
+                            <div class="mb-3"><label for="product-contentType" class="form-label">Tipo</label><select
+                                    id="product-contentType" class="form-select">
+                                    <option value="unidade">Unidade</option>
+                                    <option value="peso">Peso (kg)</option>
+                                </select></div>
+                            <div class="mb-3"><label for="product-contentValue" class="form-label">Valor do
+                                    Conteúdo</label><input type="number" step="0.01" class="form-control"
+                                    id="product-contentValue" required></div>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">Cancelar</button><button type="submit"
+                                class="btn btn-warning">Salvar</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="orderDetailsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="orderDetailsModalTitle"></h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="list-group" id="order-items-list"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="customerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Cliente</h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="customer-form">
+                        <div class="mb-2"><label class="form-label">Nome</label><input type="text" class="form-control"
+                                id="customer-name-edit"></div>
+                        <div class="mb-2"><label class="form-label">CNPJ</label><input type="text" class="form-control"
+                                id="customer-cnpj-edit"></div>
+                        <div class="mb-2"><label class="form-label">Endereço</label><input type="text"
+                                class="form-control" id="customer-address-edit"></div>
+                        <div class="mb-2"><label class="form-label">Cidade</label><input type="text"
+                                class="form-control" id="customer-city-edit"></div>
+                        <div class="mb-2"><label class="form-label">Estado</label><input type="text"
+                                class="form-control" id="customer-state-edit" maxlength="2"></div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">Cancelar</button><button type="submit"
+                                class="btn btn-warning">Salvar</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="userModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalTitle"></h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="user-form"><input type="hidden" id="user-id">
+                        <div class="mb-3"><label for="user-name" class="form-label">Nome Completo</label><input
+                                type="text" class="form-control" id="user-name" required></div>
+                        <div class="mb-3"><label for="user-username" class="form-label">Usuário (login)</label><input
+                                type="text" class="form-control" id="user-username" required></div>
+                        <div class="mb-3"><label for="user-password" class="form-label">Senha</label><input
+                                type="password" class="form-control" id="user-password"><small
+                                class="form-text text-muted">Deixe em branco para não alterar.</small></div>
+                        <div class="mb-3"><label for="user-role" class="form-label">Permissão</label><select
+                                id="user-role" class="form-select">
+                                <option value="atendente">Atendente</option>
+                                <option value="admin">Administrador</option>
+                            </select></div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">Cancelar</button><button type="submit"
+                                class="btn btn-warning">Salvar</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="notification-sound"
+        src="https://www.zapsplat.com/wp-content/uploads/2015/sound-design/notification_simple-soft.mp3"
+        preload="auto"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+    <script src="/dashboard.js" defer></script>
+</body>
+
+</html>
+</body>
+
+</html>
