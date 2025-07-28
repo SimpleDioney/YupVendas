@@ -26,9 +26,24 @@
 
         .card,
         .list-group-item,
-        .modal-content {
+        .modal-content,
+        .accordion-item {
             background-color: #212529;
             border: 1px solid #495057;
+        }
+
+        .accordion-button {
+            background-color: #343a40;
+            color: #f8f9fa;
+        }
+
+        .accordion-button:not(.collapsed) {
+            background-color: #495057;
+            color: #f8f9fa;
+        }
+
+        .accordion-button:focus {
+            box-shadow: 0 0 0 .25rem rgba(255, 193, 7, .25);
         }
 
         .table {
@@ -68,10 +83,6 @@
             box-shadow: 0 0 0 .25rem rgba(255, 193, 7, .25);
         }
 
-        .toast {
-            min-width: 250px;
-        }
-
         .customer-list {
             max-height: 500px;
             overflow-y: auto;
@@ -108,13 +119,7 @@
         }
 
         .chat-message.admin,
-        .chat-message[data-sender-role='admin'] {
-            background-color: #005c4b;
-            color: white;
-            margin-left: auto;
-            align-items: flex-end;
-        }
-
+        .chat-message[data-sender-role='admin'],
         .chat-message[data-sender-role='atendente'] {
             background-color: #005c4b;
             color: white;
@@ -194,6 +199,9 @@
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab"
                     data-bs-target="#messaging-tab-pane" type="button">💬 Chat</button></li>
+            <li class="nav-item" id="add-customer-tab-li" style="display: none;" role="presentation"><button
+                    class="nav-link" data-bs-toggle="tab" data-bs-target="#add-customer-tab-pane">➕ Cadastrar
+                    Cliente</button></li>
             <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
                     data-bs-target="#products-tab-pane" type="button">📦 Produtos</button></li>
             <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
@@ -203,7 +211,10 @@
             <li class="nav-item" id="reports-tab-li" style="display: none;" role="presentation"><button class="nav-link"
                     data-bs-toggle="tab" data-bs-target="#reports-tab-pane">📊 Relatórios</button></li>
             <li class="nav-item" id="users-tab-li" style="display: none;" role="presentation"><button class="nav-link"
-                    data-bs-toggle="tab" data-bs-target="#users-tab-pane">⚙️ Usuários</button></li>
+                    data-bs-toggle="tab" data-bs-target="#users-tab-pane">👥 Usuários</button></li>
+            <li class="nav-item" id="settings-tab-li" style="display: none;" role="presentation"><button
+                    class="nav-link" data-bs-toggle="tab" data-bs-target="#settings-tab-pane">⚙️ Configurações</button>
+            </li>
         </ul>
 
         <div class="tab-content" id="myTabContent">
@@ -228,14 +239,12 @@
                                         for="human-mode-toggle" id="human-mode-label"></label></div>
                             </div>
                             <div class="chat-box mb-2" id="chat-box"></div>
-                            <form id="send-message-form" class="d-flex gap-2">
-                                <input type="hidden" id="selected-customer-phone">
-                                <button type="button" class="btn btn-outline-secondary" id="emoji-button">😊</button>
-                                <textarea class="form-control" id="message-text" rows="1"
-                                    placeholder="Digite sua mensagem..." required></textarea>
-                                <button type="submit" class="btn btn-warning"><i
-                                        class="fa-solid fa-paper-plane"></i></button>
-                            </form>
+                            <form id="send-message-form" class="d-flex gap-2"><input type="hidden"
+                                    id="selected-customer-phone"><button type="button" class="btn btn-outline-secondary"
+                                    id="emoji-button">😊</button><textarea class="form-control" id="message-text"
+                                    rows="1" placeholder="Digite sua mensagem..." required></textarea><button
+                                    type="submit" class="btn btn-warning"><i
+                                        class="fa-solid fa-paper-plane"></i></button></form>
                         </div>
                         <div id="messaging-placeholder"
                             class="d-flex align-items-center justify-content-center text-center p-5 border rounded h-100">
@@ -246,11 +255,65 @@
                     </div>
                 </div>
             </div>
+
+            <div class="tab-pane fade p-3" id="add-customer-tab-pane" role="tabpanel">
+                <h3>Cadastrar Novo Cliente</h3>
+                <p class="text-muted">Consulte um CNPJ para preencher os dados automaticamente ou preencha manualmente.
+                </p>
+                <div class="card">
+                    <div class="card-body">
+                        <form id="add-customer-form">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3"><label for="new-customer-cnpj" class="form-label">CNPJ</label>
+                                        <div class="input-group"><input type="text" class="form-control"
+                                                id="new-customer-cnpj" placeholder="Apenas números"><button
+                                                class="btn btn-outline-warning" type="button"
+                                                id="consult-cnpj-btn"><span
+                                                    class="spinner-border spinner-border-sm d-none" role="status"
+                                                    aria-hidden="true"></span> Consultar</button></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3"><label for="new-customer-phone" class="form-label">Telefone
+                                            (WhatsApp)</label><input type="text" class="form-control"
+                                            id="new-customer-phone" placeholder="5543999998888" required></div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-3"><label for="new-customer-name" class="form-label">Nome / Razão
+                                            Social</label><input type="text" class="form-control" id="new-customer-name"
+                                            required></div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="mb-3"><label for="new-customer-address"
+                                            class="form-label">Endereço</label><input type="text" class="form-control"
+                                            id="new-customer-address"></div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="mb-3"><label for="new-customer-city"
+                                            class="form-label">Cidade</label><input type="text" class="form-control"
+                                            id="new-customer-city"></div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3"><label for="new-customer-state" class="form-label">Estado
+                                            (UF)</label><input type="text" class="form-control" id="new-customer-state"
+                                            maxlength="2"></div>
+                                </div>
+                            </div><button type="submit" class="btn btn-warning"><i class="fa-solid fa-plus"></i>
+                                Cadastrar Cliente</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <div class="tab-pane fade p-3" id="products-tab-pane" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3>Gerenciamento de Produtos</h3>
-                    <button id="add-product-button" class="btn btn-warning" style="display: none;"
-                        onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Novo Produto</button>
+                    <h3>Gerenciamento de Produtos</h3><button id="add-product-button" class="btn btn-warning"
+                        style="display: none;" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Novo
+                        Produto</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
@@ -297,6 +360,14 @@
                             class="btn btn-sm btn-link mt-1" onclick="selectAllCustomers(false)">Desmarcar
                             todos</button>
                     </div>
+
+                    <div class="mb-3">
+                        <label for="campaign-template-select" class="form-label">Templates de Mensagem</label>
+                        <select class="form-select" id="campaign-template-select">
+                            <option selected value="">-- Selecione um template --</option>
+                        </select>
+                    </div>
+
                     <div class="mb-3"><label for="campaign-message" class="form-label">Mensagem</label><textarea
                             class="form-control" id="campaign-message" rows="5" required></textarea></div><button
                         type="submit" class="btn btn-danger"><i class="fa-solid fa-bullhorn"></i> Iniciar Envio</button>
@@ -337,6 +408,325 @@
                         <tbody id="users-table-body"></tbody>
                     </table>
                 </div>
+            </div>
+            <div class="tab-pane fade p-3" id="settings-tab-pane" role="tabpanel">
+                <h3>Personalizar Mensagens do Bot</h3>
+                <p class="text-muted">Altere os textos que o bot envia. Use as variáveis <code>{exemplo}</code> para
+                    inserir informações dinâmicas.</p>
+                <form id="messages-form">
+                    <div class="accordion" id="messages-accordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header"><button class="accordion-button" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse-general">Geral e
+                                    Utilitários</button></h2>
+                            <div id="collapse-general" class="accordion-collapse collapse show"
+                                data-bs-parent="#messages-accordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3"><label class="form-label">Aviso de Usuário Não
+                                            Cadastrado</label><textarea class="form-control"
+                                            name="unregistered_user_warning" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{senderId}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Erro Genérico</label><textarea
+                                            class="form-control" name="generic_error" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Opção Inválida</label><textarea
+                                            class="form-control" name="invalid_option" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Valor Inválido</label><textarea
+                                            class="form-control" name="invalid_value" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Operação Cancelada</label><textarea
+                                            class="form-control" name="operation_cancelled" rows="1"></textarea></div>
+                                    <hr>
+                                    <h5 class="h6">Textos de Botões</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3"><label class="form-label">Botão "Opções"</label><input
+                                                    type="text" class="form-control" name="button_options"></div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3"><label class="form-label">Botão "Confirmar"</label><input
+                                                    type="text" class="form-control" name="button_confirm"></div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3"><label class="form-label">Botão "Ver
+                                                    Produtos"</label><input type="text" class="form-control"
+                                                    name="button_see_products"></div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3"><label class="form-label">Botão "Salvar?"</label><input
+                                                    type="text" class="form-control" name="button_save"></div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3"><label class="form-label">Botão "Ações"</label><input
+                                                    type="text" class="form-control" name="button_actions"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header"><button class="accordion-button collapsed" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse-menus">Menus e
+                                    Saudações</button></h2>
+                            <div id="collapse-menus" class="accordion-collapse collapse"
+                                data-bs-parent="#messages-accordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3"><label class="form-label">Saudação Inicial do
+                                            Cliente</label><textarea class="form-control" name="customer_menu_welcome"
+                                            rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code>,
+                                            <code>{companyName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Descrição Menu Cliente</label><textarea
+                                            class="form-control" name="customer_menu_description" rows="2"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Título Seção Menu Cliente</label><input
+                                            type="text" class="form-control" name="customer_menu_section_title"></div>
+                                    <hr>
+                                    <div class="mb-3"><label class="form-label">Título Menu Admin</label><input
+                                            type="text" class="form-control" name="admin_menu_title"></div>
+                                    <div class="mb-3"><label class="form-label">Título Seção Menu Admin</label><input
+                                            type="text" class="form-control" name="admin_menu_section_title"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header"><button class="accordion-button collapsed" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse-customer-flow">Fluxo do
+                                    Cliente</button></h2>
+                            <div id="collapse-customer-flow" class="accordion-collapse collapse"
+                                data-bs-parent="#messages-accordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3"><label class="form-label">Pergunta de Carrinho
+                                            Salvo</label><textarea class="form-control" name="cart_resume_prompt"
+                                            rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{itemCount}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Carrinho Esvaziado</label><textarea
+                                            class="form-control" name="cart_cleared" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Confirmação Carrinho
+                                            Esvaziado</label><textarea class="form-control"
+                                            name="cart_cleared_confirmation" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Sem Produtos em Estoque</label><textarea
+                                            class="form-control" name="products_unavailable" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Cabeçalho Lista de
+                                            Produtos</label><textarea class="form-control" name="products_list_header"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt de Quantidade</label><textarea
+                                            class="form-control" name="product_selection_prompt"
+                                            rows="3"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code>,
+                                            <code>{productName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Carrinho Vazio</label><textarea
+                                            class="form-control" name="cart_empty" rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Item Adicionado ao
+                                            Carrinho</label><textarea class="form-control" name="item_added_to_cart"
+                                            rows="3"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code>,
+                                            <code>{quantity}</code>, <code>{productName}</code>,
+                                            <code>{itemCount}</code>, <code>{total}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Aviso de Pedido Mínimo</label><textarea
+                                            class="form-control" name="order_below_minimum" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code>,
+                                            <code>{cartTotal}</code>, <code>{minOrderValue}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Aviso de Estoque Atualizado (na
+                                            finalização)</label><textarea class="form-control"
+                                            name="stock_updated_warning" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code>,
+                                            <code>{productName}</code>, <code>{stock}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Confirmação de Pedido</label><textarea
+                                            class="form-control" name="order_confirmation" rows="4"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code>,
+                                            <code>{orderId}</code>, <code>{total}</code>,
+                                            <code>{companyName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt para Salvar
+                                            Pedido</label><textarea class="form-control" name="save_order_prompt"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Pedido Salvo com
+                                            Sucesso</label><textarea class="form-control"
+                                            name="order_saved_confirmation" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Pedido Não Salvo</label><textarea
+                                            class="form-control" name="order_not_saved_confirmation"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Nenhum Pedido Padrão
+                                            Salvo</label><textarea class="form-control" name="no_saved_order"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Pedido Padrão Carregado</label><textarea
+                                            class="form-control" name="saved_order_loaded" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Notificação de
+                                            Estoque</label><textarea class="form-control" name="out_of_stock_prompt"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Notificação de Estoque
+                                            Ativada</label><textarea class="form-control"
+                                            name="out_of_stock_notification_set" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Já na Lista de Espera do
+                                            Estoque</label><textarea class="form-control" name="already_in_waitlist"
+                                            rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Notificação de Volta ao
+                                            Estoque</label><textarea class="form-control"
+                                            name="stock_notification_callback" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{productName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Histórico de Pedidos
+                                            Vazio</label><textarea class="form-control" name="order_history_empty"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{customerName}</code></small></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header"><button class="accordion-button collapsed" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse-admin-flow">Fluxo do
+                                    Admin</button></h2>
+                            <div id="collapse-admin-flow" class="accordion-collapse collapse"
+                                data-bs-parent="#messages-accordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3"><label class="form-label">Notificação de Novo
+                                            Pedido</label><textarea class="form-control"
+                                            name="admin_notification_new_order" rows="6"></textarea><small
+                                            class="form-text text-muted"><code>{orderId}</code>,
+                                            <code>{customerName}</code>, <code>{phone}</code>, <code>{cnpj}</code>,
+                                            <code>{address}</code>, <code>{city}</code>, <code>{state}</code>,
+                                            <code>{items}</code>, <code>{total}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Título Gerenciar Clientes</label><input
+                                            type="text" class="form-control" name="customer_management_title"></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Telefone Cliente</label><textarea
+                                            class="form-control" name="customer_add_phone_prompt" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Nenhum Cliente para
+                                            Remover</label><textarea class="form-control" name="no_customers_to_remove"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Remover Cliente</label><input
+                                            type="text" class="form-control" name="customer_remove_prompt"></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso ao Remover
+                                            Cliente</label><textarea class="form-control"
+                                            name="customer_removed_success" rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{phone}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt CNPJ Cliente</label><textarea
+                                            class="form-control" name="customer_add_cnpj_prompt" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Prompt Cadastro Manual</label><textarea
+                                            class="form-control" name="customer_add_manual_prompt" rows="2"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Consultando CNPJ</label><textarea
+                                            class="form-control" name="cnpj_consulting" rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{cnpj}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Erro API CNPJ</label><textarea
+                                            class="form-control" name="cnpj_api_error" rows="2"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Dados do CNPJ
+                                            Encontrados</label><textarea class="form-control" name="cnpj_data_found"
+                                            rows="4"></textarea><small
+                                            class="form-text text-muted"><code>{razao_social}</code>,
+                                            <code>{address}</code>, <code>{city}</code>, <code>{state}</code></small>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Título Confirmação CNPJ</label><input
+                                            type="text" class="form-control" name="cnpj_data_confirmation_title"></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Endereço</label><textarea
+                                            class="form-control" name="customer_add_address_prompt" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Prompt Cidade</label><textarea
+                                            class="form-control" name="customer_add_city_prompt" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Cadastro Cliente
+                                            (API)</label><textarea class="form-control" name="customer_add_success"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{razao_social}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Cadastro Cliente
+                                            (Manual)</label><textarea class="form-control"
+                                            name="customer_add_manual_success" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Cliente Já Existe</label><textarea
+                                            class="form-control" name="customer_already_exists" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Título Gerenciar Produtos</label><input
+                                            type="text" class="form-control" name="product_management_title"></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Nome do Produto</label><textarea
+                                            class="form-control" name="product_add_name_prompt" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Nenhum Produto
+                                            Cadastrado</label><textarea class="form-control"
+                                            name="no_products_registered" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Selecionar Produto</label><input
+                                            type="text" class="form-control" name="product_select_prompt"></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Ação com Produto</label><textarea
+                                            class="form-control" name="product_action_prompt" rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{productName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Editar Campo</label><textarea
+                                            class="form-control" name="product_edit_field_prompt"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{field}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Adicionar
+                                            Estoque</label><textarea class="form-control"
+                                            name="product_stock_add_prompt" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Remover Estoque</label><textarea
+                                            class="form-control" name="product_stock_remove_prompt" rows="1"></textarea>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Confirmar Apagar
+                                            Produto</label><textarea class="form-control" name="confirm_delete_product"
+                                            rows="3"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Tipo de Conteúdo</label><input
+                                            type="text" class="form-control" name="product_content_type_prompt"></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Quantidade
+                                            Unidades</label><textarea class="form-control"
+                                            name="product_content_unit_prompt" rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Peso (kg)</label><textarea
+                                            class="form-control" name="product_content_weight_prompt"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Preço do Produto</label><textarea
+                                            class="form-control" name="product_add_price_prompt"
+                                            rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{name}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Estoque Inicial</label><textarea
+                                            class="form-control" name="product_add_stock_prompt"
+                                            rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{price}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Cadastro
+                                            Produto</label><textarea class="form-control" name="product_add_success"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{productName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Alterar Nome</label><textarea
+                                            class="form-control" name="product_update_success"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{productName}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Alterar Preço</label><textarea
+                                            class="form-control" name="price_update_success" rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{newPrice}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Alterar Estoque</label><textarea
+                                            class="form-control" name="stock_update_success" rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{productName}</code>,
+                                            <code>{newStock}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Estoque Insuficiente para
+                                            Remover</label><textarea class="form-control"
+                                            name="stock_insufficient_to_remove" rows="2"></textarea><small
+                                            class="form-text text-muted"><code>{quantity}</code>,
+                                            <code>{stock}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Produto Removido com
+                                            Sucesso</label><textarea class="form-control" name="product_removed_success"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Enviando Notificação de
+                                            Estoque</label><textarea class="form-control" name="stock_notification_sent"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{count}</code></small></div>
+                                    <div class="mb-3"><label class="form-label">Título Relatórios</label><input
+                                            type="text" class="form-control" name="reports_title"></div>
+                                    <div class="mb-3"><label class="form-label">Sem Dados para
+                                            Relatório</label><textarea class="form-control" name="report_no_data"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Prompt Novo Pedido
+                                            Mínimo</label><textarea class="form-control" name="min_order_set_prompt"
+                                            rows="1"></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Sucesso Alterar Pedido
+                                            Mínimo</label><textarea class="form-control" name="min_order_update_success"
+                                            rows="1"></textarea><small
+                                            class="form-text text-muted"><code>{minOrder}</code></small></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3"><button type="submit" class="btn btn-warning"><i class="fa-solid fa-save"></i>
+                            Salvar Todas as Mensagens</button></div>
+                </form>
             </div>
         </div>
     </div>
@@ -448,13 +838,9 @@
     <audio id="notification-sound"
         src="https://www.zapsplat.com/wp-content/uploads/2015/sound-design/notification_simple-soft.mp3"
         preload="auto"></audio>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
     <script src="/dashboard.js" defer></script>
-</body>
-
-</html>
 </body>
 
 </html>

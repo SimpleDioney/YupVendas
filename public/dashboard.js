@@ -1,5 +1,5 @@
 // =================================================================
-// DASHBOARD.JS - VERSÃO V6.3 (CORREÇÃO DE ERRO DE SCRIPT)
+// DASHBOARD.JS - VERSÃO FINAL (COM CADASTRO DE CLIENTE)
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -32,9 +32,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let allCustomers = [];
     let currentCustomer = null;
     let audioUnlocked = false;
-    let chatPollingInterval = null; // Removido na V6, mas mantido caso precise de fallback. Limpamos para garantir.
-    if(chatPollingInterval) clearInterval(chatPollingInterval);
-
 
     const customerModal = new bootstrap.Modal(document.getElementById('customerModal'));
     const productModal = new bootstrap.Modal(document.getElementById('productModal'));
@@ -42,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userModal = new bootstrap.Modal(document.getElementById('userModal'));
     const toastEl = document.getElementById('liveToast');
     const toast = new bootstrap.Toast(toastEl);
-    
+
     const messagingPlaceholder = document.getElementById('messaging-placeholder');
     const messagingArea = document.getElementById('messaging-area');
     const notificationSound = document.getElementById('notification-sound');
@@ -65,37 +62,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('reports-tab-li').style.display = 'block';
         document.getElementById('users-tab-li').style.display = 'block';
         document.getElementById('campaigns-tab-li').style.display = 'block';
+        document.getElementById('settings-tab-li').style.display = 'block';
+        document.getElementById('add-customer-tab-li').style.display = 'block';
         document.getElementById('add-product-button').style.display = 'block';
         document.getElementById('products-actions-header').style.display = 'table-cell';
     }
 
-     function unlockAudio() {
+    function unlockAudio() {
         if (audioUnlocked) return;
         notificationSound.play().then(() => {
             notificationSound.pause();
             notificationSound.currentTime = 0;
             audioUnlocked = true;
-            console.log("Áudio destravado com sucesso!");
-            document.body.removeEventListener('click', unlockAudio); // Remove o listener depois de usado
-        }).catch(e => {}); // Ignora erros se o usuário não interagiu ainda
+            document.body.removeEventListener('click', unlockAudio);
+        }).catch(e => {});
     }
     document.body.addEventListener('click', unlockAudio);
-    
-    // --- NOVO: Lógica do Seletor de Emojis ---
+
     const emojiButton = document.getElementById('emoji-button');
-const messageInput = document.getElementById('message-text');
-
-// A biblioteca agora cuida de abrir o seletor quando o botão é clicado
-const picker = new EmojiButton({
-    trigger: emojiButton,
-    position: 'top-start'
-});
-
-// Apenas dizemos o que fazer quando um emoji é selecionado
-picker.on('emoji', selection => {
-    messageInput.value += selection.emoji;
-    messageInput.focus();
-});
+    const messageInput = document.getElementById('message-text');
+    const picker = new EmojiButton({ trigger: emojiButton, position: 'top-start' });
+    picker.on('emoji', selection => {
+        messageInput.value += selection.emoji;
+        messageInput.focus();
+    });
 
     // 3. FUNÇÕES DE UI E NOTIFICAÇÃO
     function showToast(message, title = 'Notificação', isError = false) {
@@ -120,7 +110,7 @@ picker.on('emoji', selection => {
 
     function appendMessageToChat(msg, isPending = false) {
         const chatBox = document.getElementById('chat-box');
-        if(!chatBox) return;
+        if (!chatBox) return;
         const shouldScroll = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 20;
         const msgDiv = document.createElement('div');
         msgDiv.id = `msg-${isPending ? msg.tempId : msg.id}`;
@@ -136,7 +126,11 @@ picker.on('emoji', selection => {
 
     // 4. FUNÇÕES DE CARREGAMENTO DE DADOS (API)
     async function loadAllData() {
-        await Promise.all([ loadStats(), loadProducts(), loadOrders(), loadCustomers(), loadReports(), loadUsers() ]);
+        const promises = [loadStats(), loadProducts(), loadOrders(), loadCustomers()];
+        if (loggedInUser.role === 'admin') {
+            promises.push(loadReports(), loadUsers(), setupMessagesForm(), setupCampaignTemplates());;
+        }
+        await Promise.all(promises);
     }
 
     async function loadStats() {
@@ -190,11 +184,11 @@ picker.on('emoji', selection => {
     async function loadReports() {
         if (loggedInUser.role !== 'admin') return;
         try {
-            const [productsRes, customersRes] = await Promise.all([ authFetch('/api/reports/top-products'), authFetch('/api/reports/top-customers') ]);
+            const [productsRes, customersRes] = await Promise.all([authFetch('/api/reports/top-products'), authFetch('/api/reports/top-customers')]);
             const topProducts = await productsRes.json();
             const topCustomers = await customersRes.json();
             document.getElementById('top-products-list').innerHTML = topProducts.map(p => `<li class="list-group-item d-flex justify-content-between align-items-center">${p.productName} <span class="badge bg-primary">${p.total_sold}</span></li>`).join('');
-            document.getElementById('top-customers-list').innerHTML = topCustomers.map(c => `<li class="list-group-item d-flex justify-content-between align-items-center">${c.name || c.customerPhone.replace('@c.us','')} <span class="badge bg-success">R$ ${c.total_spent.toFixed(2)}</span></li>`).join('');
+            document.getElementById('top-customers-list').innerHTML = topCustomers.map(c => `<li class="list-group-item d-flex justify-content-between align-items-center">${c.name || c.customerPhone.replace('@c.us', '')} <span class="badge bg-success">R$ ${c.total_spent.toFixed(2)}</span></li>`).join('');
         } catch (error) { console.error('Erro ao carregar relatórios:', error); }
     }
 
@@ -204,40 +198,92 @@ picker.on('emoji', selection => {
             const response = await authFetch('/api/users');
             const users = await response.json();
             document.getElementById('users-table-body').innerHTML = users.map(u => `<tr><td>${u.name}</td><td>${u.username}</td><td><span class="badge ${u.role === 'admin' ? 'text-bg-warning' : 'text-bg-info'}">${u.role}</span></td><td><button class="btn btn-sm btn-primary" onclick="openUserModal(${u.id}, '${u.name}', '${u.username}', '${u.role}')">Editar</button></td></tr>`).join('');
-        } catch(error) { console.error('Erro ao carregar usuários:', error); }
+        } catch (error) { console.error('Erro ao carregar usuários:', error); }
+    }
+    
+
+    function setupCampaignTemplates() {
+        const templateSelect = document.getElementById('campaign-template-select');
+        const messageTextarea = document.getElementById('campaign-message');
+
+        if (!templateSelect || !messageTextarea) return;
+
+        const templates = {
+            "saudacao": "Olá, {nome}! Tudo bem?",
+            "promocao": "Olá, {nome}! Temos uma promoção especial para você esta semana. Não perca!",
+            "aviso": "Prezado(a) {nome}, informamos que estaremos fechados no próximo feriado. Boas festas!",
+            "estoque": "Oi, {nome}! Aquele produto que você queria voltou ao estoque. Aproveite antes que acabe!",
+        };
+
+        // Preenche o dropdown com os templates
+        for (const key in templates) {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = key.charAt(0).toUpperCase() + key.slice(1); // Capitaliza o nome
+            templateSelect.appendChild(option);
+        }
+
+        // Adiciona o listener para quando um template for selecionado
+        templateSelect.addEventListener('change', () => {
+            const selectedKey = templateSelect.value;
+            if (selectedKey && templates[selectedKey]) {
+                messageTextarea.value = templates[selectedKey];
+            } else {
+                messageTextarea.value = '';
+            }
+        });
+    }
+
+    async function setupMessagesForm() {
+        const messagesForm = document.getElementById('messages-form');
+        if (!messagesForm) return;
+        try {
+            const response = await authFetch('/api/messages');
+            if (!response.ok) throw new Error('Falha ao buscar mensagens da API.');
+            const messages = await response.json();
+            messagesForm.querySelectorAll('textarea[name], input[type="text"][name]').forEach(field => {
+                if (messages[field.name]) {
+                    field.value = messages[field.name];
+                }
+            });
+        } catch (error) {
+            showToast('Não foi possível carregar as mensagens customizáveis.', 'Erro', true);
+            console.error('Erro ao carregar mensagens:', error);
+        }
+        messagesForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(messagesForm);
+            const updatedMessages = Object.fromEntries(formData.entries());
+            try {
+                const response = await authFetch('/api/messages', { method: 'PUT', body: JSON.stringify(updatedMessages) });
+                if (!response.ok) throw new Error('Falha ao salvar');
+                showToast('Mensagens do bot atualizadas com sucesso!', 'Sucesso');
+            } catch (error) {
+                showToast('Erro ao salvar as mensagens.', 'Erro', true);
+            }
+        });
     }
 
     function renderCustomerLists(filter = '') {
-    const lowerCaseFilter = filter.toLowerCase();
-    const filteredCustomers = allCustomers.filter(c => (c.name && c.name.toLowerCase().includes(lowerCaseFilter)) || c.phone.includes(filter));
-    
-    const customerListEl = document.getElementById('customer-list');
-    customerListEl.innerHTML = filteredCustomers.map(c => `
-        <a class="list-group-item list-group-item-action" id="customer-list-item-${c.phone}" href="#" data-phone="${c.phone}">
-            <strong>${c.name || 'Sem nome'}</strong><br>
-            <small class="text-muted">${c.phone.replace('@c.us', '')}</small>
-        </a>
-    `).join('');
-
-    // 2. ADICIONAMOS o evento de clique aqui, onde 'allCustomers' é visível
-    document.querySelectorAll('#customer-list a').forEach(link => {
-        link.addEventListener('click', (event) => {
-            event.preventDefault(); // Impede que o link mude a URL
-            const phone = link.getAttribute('data-phone');
-            const customer = allCustomers.find(c => c.phone === phone);
-            if (customer) {
-                displayChat(customer);
-            }
+        const lowerCaseFilter = filter.toLowerCase();
+        const filteredCustomers = allCustomers.filter(c => (c.name && c.name.toLowerCase().includes(lowerCaseFilter)) || c.phone.includes(filter));
+        const customerListEl = document.getElementById('customer-list');
+        customerListEl.innerHTML = filteredCustomers.map(c => `<a class="list-group-item list-group-item-action" id="customer-list-item-${c.phone}" href="#" data-phone="${c.phone}"><strong>${c.name || 'Sem nome'}</strong><br><small class="text-muted">${c.phone.replace('@c.us', '')}</small></a>`).join('');
+        document.querySelectorAll('#customer-list a').forEach(link => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
+                const phone = link.getAttribute('data-phone');
+                const customer = allCustomers.find(c => c.phone === phone);
+                if (customer) displayChat(customer);
+            });
         });
-    });
-
-    if (loggedInUser.role === 'admin') {
-        const campaignCustomerListEl = document.getElementById('campaign-customer-list');
-        campaignCustomerListEl.innerHTML = allCustomers.map(c => `<div class="form-check"><input class="form-check-input" type="checkbox" value="${c.phone}" id="camp-cust-${c.phone}"><label class="form-check-label" for="camp-cust-${c.phone}">${c.name || 'Sem nome'} (${c.phone.replace('@c.us', '')})</label></div>`).join('');
+        if (loggedInUser.role === 'admin') {
+            const campaignCustomerListEl = document.getElementById('campaign-customer-list');
+            campaignCustomerListEl.innerHTML = allCustomers.map(c => `<div class="form-check"><input class="form-check-input" type="checkbox" value="${c.phone}" id="camp-cust-${c.phone}"><label class="form-check-label" for="camp-cust-${c.phone}">${c.name || 'Sem nome'} (${c.phone.replace('@c.us', '')})</label></div>`).join('');
+        }
     }
-}
 
-    // 5. FUNÇÕES GLOBAIS (invocadas pelo HTML via onclick)
+    // 5. FUNÇÕES GLOBAIS
     window.openProductModal = (id = null, name = '', price = '') => {
         document.getElementById('product-form').reset();
         document.getElementById('product-id').value = id;
@@ -247,7 +293,6 @@ picker.on('emoji', selection => {
         document.getElementById('new-product-fields').style.display = id ? 'none' : 'block';
         productModal.show();
     };
-
     window.updateStockWrapper = async (id, multiplier) => {
         const input = document.getElementById(`stock-input-${id}`);
         const quantity = parseInt(input.value);
@@ -259,7 +304,6 @@ picker.on('emoji', selection => {
             input.value = '';
         } catch (error) { showToast(`Erro ao atualizar estoque: ${error.message}`, 'Erro', true); }
     };
-
     window.openOrderDetails = async (orderId) => {
         try {
             const response = await authFetch(`/api/orders/${orderId}`);
@@ -270,7 +314,6 @@ picker.on('emoji', selection => {
             orderDetailsModal.show();
         } catch (error) { showToast(`Erro ao buscar detalhes: ${error.message}`, 'Erro', true); }
     };
-
     window.openCustomerModal = () => {
         if (!currentCustomer) return;
         document.getElementById('customer-form').reset();
@@ -281,7 +324,6 @@ picker.on('emoji', selection => {
         document.getElementById('customer-state-edit').value = currentCustomer.state || '';
         customerModal.show();
     };
-
     window.openUserModal = (id = null, name = '', username = '', role = 'atendente') => {
         document.getElementById('user-form').reset();
         document.getElementById('user-id').value = id;
@@ -292,7 +334,6 @@ picker.on('emoji', selection => {
         document.getElementById('user-password').required = !id;
         userModal.show();
     };
-
     window.displayChat = async (customer) => {
         document.querySelectorAll('.customer-list a').forEach(el => el.classList.remove('active'));
         document.getElementById(`customer-list-item-${customer.phone}`).classList.add('active');
@@ -314,12 +355,65 @@ picker.on('emoji', selection => {
             chatBox.innerHTML = '';
             messages.forEach(msg => appendMessageToChat(msg));
             chatBox.scrollTop = chatBox.scrollHeight;
-        } catch(e) { chatBox.innerHTML = '<div class="text-center text-danger">Erro ao carregar histórico.</div>' }
+        } catch (e) { chatBox.innerHTML = '<div class="text-center text-danger">Erro ao carregar histórico.</div>' }
     };
-
     window.selectAllCustomers = (checked) => document.querySelectorAll('#campaign-customer-list .form-check-input').forEach(c => c.checked = checked);
 
     // 6. EVENT LISTENERS
+    document.getElementById('logout-button').addEventListener('click', () => {
+        localStorage.removeItem('authToken');
+        window.location.href = '/login.html';
+    });
+    
+    document.getElementById('consult-cnpj-btn').addEventListener('click', async () => {
+        const cnpjInput = document.getElementById('new-customer-cnpj');
+        const cnpj = cnpjInput.value.replace(/\D/g, '');
+        if (cnpj.length !== 14) { return showToast('Por favor, digite um CNPJ válido com 14 dígitos.', 'Erro', true); }
+        const button = document.getElementById('consult-cnpj-btn');
+        const spinner = button.querySelector('.spinner-border');
+        button.disabled = true;
+        spinner.classList.remove('d-none');
+        try {
+            const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+            if (!response.ok) { throw new Error('CNPJ não encontrado ou inválido.'); }
+            const data = await response.json();
+            document.getElementById('new-customer-name').value = data.razao_social || '';
+            const fullAddress = `${data.descricao_tipo_de_logradouro || ''} ${data.logradouro || ''}, ${data.numero || ''} - ${data.bairro || ''}`.trim();
+            document.getElementById('new-customer-address').value = fullAddress;
+            document.getElementById('new-customer-city').value = data.municipio || '';
+            document.getElementById('new-customer-state').value = data.uf || '';
+            showToast('Dados do CNPJ preenchidos!', 'Sucesso');
+        } catch (error) {
+            showToast(error.message, 'Erro na Consulta', true);
+        } finally {
+            button.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    });
+
+    document.getElementById('add-customer-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = {
+            phone: document.getElementById('new-customer-phone').value,
+            cnpj: document.getElementById('new-customer-cnpj').value.replace(/\D/g, ''),
+            name: document.getElementById('new-customer-name').value,
+            address: document.getElementById('new-customer-address').value,
+            city: document.getElementById('new-customer-city').value,
+            state: document.getElementById('new-customer-state').value
+        };
+        if (!body.phone || !body.name) { return showToast('Telefone e Nome são obrigatórios.', 'Atenção', true); }
+        try {
+            const response = await authFetch('/api/customers', { method: 'POST', body: JSON.stringify(body) });
+            const result = await response.json();
+            if (!response.ok) { throw new Error(result.message); }
+            showToast(result.message, 'Sucesso');
+            e.target.reset();
+            loadCustomers();
+        } catch (error) {
+            showToast(error.message, 'Erro ao Cadastrar', true);
+        }
+    });
+
     document.getElementById('product-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('product-id').value;
@@ -344,11 +438,11 @@ picker.on('emoji', selection => {
             await authFetch(`/api/customers/${encodeURIComponent(currentCustomer.phone)}`, { method: 'PUT', body: JSON.stringify(body) });
             showToast('Cliente atualizado!', 'Sucesso');
             customerModal.hide();
-            const oldPhone = currentCustomer.phone; // Guardar o telefone antigo
+            const oldPhone = currentCustomer.phone;
             await loadCustomers();
             const updatedCustomer = allCustomers.find(c => c.phone === oldPhone);
             if (updatedCustomer) displayChat(updatedCustomer);
-        } catch(error) { showToast(`Erro ao atualizar cliente: ${error.message}`, 'Erro', true); }
+        } catch (error) { showToast(`Erro ao atualizar cliente: ${error.message}`, 'Erro', true); }
     });
 
     document.getElementById('user-form').addEventListener('submit', async (e) => {
@@ -357,7 +451,7 @@ picker.on('emoji', selection => {
         const password = document.getElementById('user-password').value;
         const isEditing = !!id;
         let body = { name: document.getElementById('user-name').value, username: document.getElementById('user-username').value, role: document.getElementById('user-role').value };
-        if (password) { body.password = password; } 
+        if (password) { body.password = password; }
         else if (!isEditing) { return showToast('A senha é obrigatória para novos usuários.', 'Erro', true); }
         const url = isEditing ? `/api/users/${id}` : '/api/users';
         const method = isEditing ? 'PUT' : 'POST';
@@ -401,7 +495,7 @@ picker.on('emoji', selection => {
             currentCustomer.isHumanMode = isHumanMode;
         } catch (error) { showToast(`Erro ao alterar modo: ${error.message}`, 'Erro', true); }
     });
-    
+
     document.getElementById('campaign-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const message = document.getElementById('campaign-message').value;
@@ -418,8 +512,8 @@ picker.on('emoji', selection => {
     });
 
     document.getElementById('customer-search-input').addEventListener('input', (e) => renderCustomerLists(e.target.value));
-    
-    window.onfocus = () => { document.title = 'Painel V6 - YUP'; };
+
+    window.onfocus = () => { document.title = 'Painel - YUP'; };
     chatTabButton.addEventListener('click', () => { chatTabButton.classList.remove('blinking-border'); });
 
     // 7. CARREGAMENTO INICIAL
