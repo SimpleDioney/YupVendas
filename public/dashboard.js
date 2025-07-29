@@ -1,5 +1,5 @@
 // =================================================================
-// DASHBOARD.JS - VERSÃO FINAL (COM CADASTRO DE CLIENTE)
+// DASHBOARD.JS - VERSÃO FINAL (COM CADASTRO DE CLIENTE E CORREÇÕES)
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -131,10 +131,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await authFetch('/api/config');
             const config = await response.json();
             
-            const toggle = document.getElementById('registration-required-toggle');
-            if (toggle) {
-                toggle.checked = (config.registration_required === 'true');
+            const registrationToggle = document.getElementById('registration-required-toggle');
+            if (registrationToggle) {
+                registrationToggle.checked = (config.registration_required === 'true');
             }
+            
+            const mpToggle = document.getElementById('mp-enabled-toggle');
+            if (mpToggle) {
+                mpToggle.checked = (config.payment_mercado_pago_enabled === 'true');
+            }
+            const mpTokenInput = document.getElementById('mp-token-input');
+            if (mpTokenInput) {
+                mpTokenInput.value = config.payment_mercado_pago_token || ''; 
+            }
+
         } catch (error) {
             console.error('Erro ao carregar configurações:', error);
         }
@@ -143,7 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function loadAllData() {
         const promises = [loadStats(), loadProducts(), loadOrders(), loadCustomers()];
         if (loggedInUser.role === 'admin') {
-            promises.push(loadReports(), loadUsers(), setupMessagesForm(), setupCampaignTemplates(), loadConfig()); // Adicione loadConfig() aqui
+            promises.push(loadReports(), loadUsers(), setupMessagesForm(), setupCampaignTemplates(), loadConfig());
         }
         await Promise.all(promises);
     }
@@ -230,15 +240,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             "estoque": "Oi, {nome}! Aquele produto que você queria voltou ao estoque. Aproveite antes que acabe!",
         };
 
-        // Preenche o dropdown com os templates
         for (const key in templates) {
             const option = document.createElement('option');
             option.value = key;
-            option.textContent = key.charAt(0).toUpperCase() + key.slice(1); // Capitaliza o nome
+            option.textContent = key.charAt(0).toUpperCase() + key.slice(1);
             templateSelect.appendChild(option);
         }
 
-        // Adiciona o listener para quando um template for selecionado
         templateSelect.addEventListener('change', () => {
             const selectedKey = templateSelect.value;
             if (selectedKey && templates[selectedKey]) {
@@ -479,6 +487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) { showToast(`Erro ao salvar usuário: ${error.message}`, 'Erro', true); }
     });
 
+    // CORREÇÃO: Lógica para salvar os toggles movida para event listeners individuais
     const registrationToggle = document.getElementById('registration-required-toggle');
     if (registrationToggle) {
         registrationToggle.addEventListener('change', async (e) => {
@@ -492,6 +501,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (error) {
                 showToast(`Erro ao alterar modo de acesso: ${error.message}`, 'Erro', true);
                 e.target.checked = !isRequired; // Reverte o toggle em caso de erro
+            }
+        });
+    }
+
+    const saveMpBtn = document.getElementById('save-mp-settings-btn');
+    if (saveMpBtn) {
+        saveMpBtn.addEventListener('click', async () => {
+            const isEnabled = document.getElementById('mp-enabled-toggle').checked;
+            const token = document.getElementById('mp-token-input').value;
+
+            if (isEnabled && !token) {
+                return showToast('Para ativar o pagamento, o Access Token é obrigatório.', 'Erro', true);
+            }
+
+            try {
+                await authFetch('/api/config/payment', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        enabled: isEnabled,
+                        token: token
+                    })
+                });
+                showToast('Configurações de pagamento salvas com sucesso!', 'Sucesso');
+            } catch (error) {
+                showToast(`Erro ao salvar configurações: ${error.message}`, 'Erro', true);
             }
         });
     }

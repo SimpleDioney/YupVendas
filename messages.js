@@ -1,6 +1,19 @@
 // messages.js
 
 module.exports = {
+
+    // =================================================================
+    // NOVAS MENSAGENS DE PAGAMENTO
+    // =================================================================
+    payment_prompt: "Como você gostaria de pagar?",
+    payment_option_pix: "PIX (QR Code e Copia e Cola)",
+    payment_pix_instructions: "Tudo pronto! Escaneie o QR Code abaixo ou use o código Copia e Cola para pagar.\n\nVocê tem 15 minutos para concluir o pagamento.",
+    payment_pix_code_title: "Código Pix (Copia e Cola):",
+    payment_successful_customer: "✅ Pagamento confirmado! Seu pedido *#{orderId}* já está sendo preparado. Obrigado pela preferência!",
+    payment_successful_admin: "✅ Pagamento do pedido *#{orderId}* de {customerName} foi confirmado via Pix.",
+    payment_failed_customer: "❌ O pagamento para o pedido *#{orderId}* não foi concluído a tempo. O pedido foi cancelado. Se precisar de ajuda, entre em contato.",
+    payment_failed_admin: "❌ O pagamento para o pedido *#{orderId}* de {customerName} expirou e o pedido foi cancelado.",
+    
     // =================================================================
     // GERAL E UTILITÁRIOS
     // =================================================================

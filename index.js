@@ -16,7 +16,6 @@ let botMessages = {};
 // FUNÇÕES DE GERENCIAMENTO DE MENSAGENS
 // -----------------------------------------------------------------
 function loadBotMessages() {
-    // CORREÇÃO: Aponta para a tabela 'bot_messages'
     db.all("SELECT key, content FROM bot_messages", [], (err, rows) => {
         if (err) {
             console.error("❌ Erro fatal ao carregar mensagens do bot. Usando fallback.", err);
@@ -29,7 +28,6 @@ function loadBotMessages() {
 }
 
 function populateInitialMessages() {
-    // CORREÇÃO: Aponta para a tabela 'bot_messages'
     const stmt = db.prepare("INSERT OR IGNORE INTO bot_messages (key, content) VALUES (?, ?)");
     for (const key in initialMessages) {
         stmt.run(key, initialMessages[key]);
@@ -56,7 +54,14 @@ wppconnect
     })
     .then((client) => {
         populateInitialMessages();
-        const io = initializeWebServer(client, loadBotMessages);
+        const io = initializeWebServer(client, loadBotMessages, botMessages);
+        
+        io.on('connection', (socket) => {
+            socket.on('paymentUpdate', (data) => {
+                console.log(`[Socket.IO] Recebida atualização de pagamento para pedido ${data.orderId}: ${data.status}`);
+            });
+        });
+        
         start(client, io);
     })
     .catch((error) => console.log(error));
@@ -70,7 +75,6 @@ async function start(client, io) {
 
         const senderId = message.from;
 
-        // Pega todas as configurações de uma vez para otimizar
         const configRows = await dbAll(`SELECT key, value FROM config`);
         const settings = configRows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
         
@@ -87,18 +91,14 @@ async function start(client, io) {
 
         if (!customer) {
             if (registrationRequired) {
-                // Comportamento ANTIGO: Se o cadastro é exigido, avisa o admin e para.
                 const warningMsg = (botMessages.unregistered_user_warning || "Aviso: O número {senderId} tentou usar o bot, mas não está cadastrado.").replace('{senderId}', senderId.replace('@c.us', ''));
                 await client.sendText(adminPhoneFull, warningMsg);
                 return;
             } else {
-                // Comportamento NOVO: Se o cadastro NÃO é exigido, cadastra o cliente automaticamente.
                 const customerName = message.sender.pushname || senderId.replace('@c.us', '');
                 try {
                     await dbRun(`INSERT INTO customers (phone, name, isHumanMode) VALUES (?, ?, ?)`, [senderId, customerName, false]);
-                    // Busca o cliente recém-criado para continuar o fluxo normalmente
                     customer = await dbGet(`SELECT * FROM customers WHERE phone = ?`, [senderId]);
-                    // Notifica o admin sobre o novo cliente auto-cadastrado
                     await client.sendText(adminPhoneFull, `✅ Novo cliente auto-cadastrado: *${customerName}* (${senderId.replace('@c.us', '')})`);
                 } catch (error) {
                     console.error("Erro ao auto-cadastrar novo cliente:", error);
@@ -107,8 +107,6 @@ async function start(client, io) {
                 }
             }
         }
-
-        // A partir daqui, o fluxo continua normalmente, pois o 'customer' sempre existirá.
         await handleCustomerLogic(client, message, customer, io);
     });
 }
@@ -132,7 +130,6 @@ async function handleCustomerLogic(client, message, originalCustomerObject, io) 
     const customer = await dbGet(`SELECT * FROM customers WHERE phone = ?`, [senderId]);
     if (!customer) return;
 
-    // CORREÇÃO: Insere na tabela 'messages' (histórico)
     try {
         const result = await dbRun(`INSERT INTO messages (customerPhone, messageBody, sender) VALUES (?, ?, 'customer')`,[senderId, message.body]);
         const savedMessage = await dbGet(`SELECT * FROM messages WHERE id = ?`, [result.lastID]);
@@ -170,8 +167,6 @@ async function handleCustomerLogic(client, message, originalCustomerObject, io) 
         }
     }
 }
-
-// ... (O restante do arquivo, a partir de `// FUNÇÕES DE CARRINHO PERSISTENTE`, é exatamente igual à última versão que enviei. Não precisa colar de novo se já tiver.)
 
 // =================================================================
 // FUNÇÕES DE CARRINHO PERSISTENTE
@@ -593,54 +588,8 @@ async function handleCustomerListResponse(client, senderId, rowId, customerName,
         await savePersistentCart(senderId);
         await client.sendText(senderId, botMessages.cart_cleared_confirmation);
     } else if (rowId === 'cart_finalize') {
-        const carrinho = carrinhos[senderId];
-        if (!carrinho || carrinho.items.length === 0) { await client.sendText(senderId, botMessages.cart_empty.replace('{customerName}', customerName)); return; }
-        const minOrderConfig = await dbGet(`SELECT value FROM config WHERE key = 'minOrderValue'`);
-        if (carrinho.total < parseFloat(minOrderConfig.value)) {
-            await client.sendText(senderId, botMessages.order_below_minimum.replace('{customerName}', customerName).replace('{cartTotal}', carrinho.total.toFixed(2)).replace('{minOrderValue}', parseFloat(minOrderConfig.value).toFixed(2))); return;
-        }
-        for (const item of carrinho.items) {
-            const productInDB = await dbGet(`SELECT stock, name FROM products WHERE id = ?`, [item.id]);
-            if (productInDB.stock < item.qtd) {
-                await client.sendText(senderId, botMessages.stock_updated_warning.replace('{customerName}', customerName).replace('{productName}', productInDB.name).replace('{stock}', productInDB.stock));
-                return;
-            }
-        }
-        const adminPhone = (await dbGet(`SELECT value FROM config WHERE key = 'adminPhone'`)).value;
-        const now = new Date().toISOString();
-        const orderResult = await dbRun(`INSERT INTO orders (customerPhone, totalValue, createdAt) VALUES (?, ?, ?)`, [senderId, carrinho.total, now]);
-        const newOrderId = orderResult.lastID;
-        for (const item of carrinho.items) {
-            await dbRun(`UPDATE products SET stock = stock - ? WHERE id = ?`, [item.qtd, item.id]);
-            await dbRun(`INSERT INTO order_items (orderId, productId, productName, quantity, pricePerUnit) VALUES (?, ?, ?, ?, ?)`,
-                [newOrderId, item.id, item.nome, item.qtd, item.preco]);
-        }
-
-        let itemsText = "";
-        carrinho.items.forEach(item => {
-            itemsText += botMessages.admin_notification_new_order_item
-                .replace('{quantity}', item.qtd).replace('{unit}', item.unidade || '').replace('{name}', item.nome);
-        });
-        const pedidoParaAdmin = botMessages.admin_notification_new_order
-            .replace('{orderId}', newOrderId).replace('{customerName}', customerName || 'Não identificado')
-            .replace('{phone}', senderId.replace('@c.us', '')).replace('{cnpj}', customer.cnpj)
-            .replace('{address}', customer.address).replace('{city}', customer.city).replace('{state}', customer.state)
-            .replace('{items}', itemsText).replace('{total}', carrinho.total.toFixed(2));
-        
-        await client.sendText(`${adminPhone}@c.us`, pedidoParaAdmin);
-
-        const confirmationMsg = botMessages.order_confirmation
-            .replace('{customerName}', customerName).replace('{orderId}', newOrderId)
-            .replace('{total}', carrinho.total.toFixed(2)).replace('{companyName}', NOME_DA_EMPRESA);
-        await client.sendText(senderId, confirmationMsg);
-
-        carrinhos[senderId] = { items: [], total: 0 };
-        await savePersistentCart(senderId);
-        const rows = [
-            { rowId: 'save_order_yes', title: botMessages.list_option_save_order_yes },
-            { rowId: 'save_order_no', title: botMessages.list_option_save_order_no }
-        ];
-        await client.sendListMessage(senderId, { buttonText: botMessages.button_save, title: botMessages.save_order_prompt, sections: [{ rows }] });
+        await finalizeOrder(client, senderId, customerName, customer);
+        return;
     } else if (rowId === 'save_order_yes') {
         const lastOrder = await dbGet(`SELECT id FROM orders WHERE customerPhone = ? ORDER BY createdAt DESC LIMIT 1`, [senderId]);
         const lastOrderItems = await dbAll(`SELECT productId, quantity FROM order_items WHERE orderId = ?`, [lastOrder.id]);
@@ -702,4 +651,93 @@ async function handleCustomerTextInput(client, senderId, text, customerName) {
         
     await client.sendText(senderId, addedToCartMsg);
     await showCustomerMenu(client, senderId, customerName);
+}
+
+async function finalizeOrder(client, senderId, customerName, customer) {
+    const carrinho = carrinhos[senderId];
+    if (!carrinho || carrinho.items.length === 0) {
+        await client.sendText(senderId, botMessages.cart_empty.replace('{customerName}', customerName));
+        return;
+    }
+
+    const minOrderConfig = await dbGet(`SELECT value FROM config WHERE key = 'minOrderValue'`);
+    if (carrinho.total < parseFloat(minOrderConfig.value)) {
+        await client.sendText(senderId, botMessages.order_below_minimum.replace('{customerName}', customerName).replace('{cartTotal}', carrinho.total.toFixed(2)).replace('{minOrderValue}', parseFloat(minOrderConfig.value).toFixed(2)));
+        return;
+    }
+
+    for (const item of carrinho.items) {
+        const productInDB = await dbGet(`SELECT stock, name FROM products WHERE id = ?`, [item.id]);
+        if (productInDB.stock < item.qtd) {
+            await client.sendText(senderId, botMessages.stock_updated_warning.replace('{customerName}', customerName).replace('{productName}', productInDB.name).replace('{stock}', productInDB.stock));
+            return;
+        }
+    }
+
+    const now = new Date().toISOString();
+    const orderResult = await dbRun(`INSERT INTO orders (customerPhone, totalValue, createdAt) VALUES (?, ?, ?)`, [senderId, carrinho.total, now]);
+    const newOrderId = orderResult.lastID;
+
+    for (const item of carrinho.items) {
+        await dbRun(`UPDATE products SET stock = stock - ? WHERE id = ?`, [item.qtd, item.id]);
+        await dbRun(`INSERT INTO order_items (orderId, productId, productName, quantity, pricePerUnit) VALUES (?, ?, ?, ?, ?)`, [newOrderId, item.id, item.nome, item.qtd, item.preco]);
+    }
+    
+    const paymentConfig = await dbGet("SELECT value FROM config WHERE key = 'payment_mercado_pago_enabled'");
+    const isPaymentEnabled = paymentConfig.value === 'true';
+
+    if (isPaymentEnabled) {
+        try {
+            const response = await axios.post(`http://localhost:3000/api/create-payment`, {
+                orderId: newOrderId,
+                totalValue: carrinho.total,
+                customerName: customerName,
+                customerPhone: senderId
+            });
+
+            const { qrCode, qrCodeCopy } = response.data;
+            
+            await client.sendText(senderId, botMessages.payment_pix_instructions);
+            await client.sendImageFromBase64(senderId, `data:image/png;base64,${qrCode}`, 'qrcode.png');
+            await client.sendText(senderId, `${botMessages.payment_pix_code_title}\n\`\`\`${qrCodeCopy}\`\`\``);
+
+        } catch (error) {
+            console.error("Erro ao chamar API de criação de pagamento:", error.response?.data || error.message);
+            await client.sendText(senderId, "Desculpe, tivemos um problema ao gerar sua cobrança Pix. Por favor, tente novamente mais tarde.");
+            for (const item of carrinho.items) {
+                await dbRun(`UPDATE products SET stock = stock + ? WHERE id = ?`, [item.qtd, item.id]);
+            }
+            return;
+        }
+
+    } else {
+        const adminPhone = (await dbGet(`SELECT value FROM config WHERE key = 'adminPhone'`)).value;
+        let itemsText = "";
+        carrinho.items.forEach(item => {
+            itemsText += botMessages.admin_notification_new_order_item.replace('{quantity}', item.qtd).replace('{unit}', item.unidade || '').replace('{name}', item.nome);
+        });
+        const pedidoParaAdmin = botMessages.admin_notification_new_order
+            .replace('{orderId}', newOrderId).replace('{customerName}', customerName || 'Não identificado')
+            .replace('{phone}', senderId.replace('@c.us', '')).replace('{cnpj}', customer.cnpj)
+            .replace('{address}', customer.address).replace('{city}', customer.city).replace('{state}', customer.state)
+            .replace('{items}', itemsText).replace('{total}', carrinho.total.toFixed(2));
+        
+        await client.sendText(`${adminPhone}@c.us`, pedidoParaAdmin);
+
+        const confirmationMsg = botMessages.order_confirmation
+            .replace('{customerName}', customerName).replace('{orderId}', newOrderId)
+            .replace('{total}', carrinho.total.toFixed(2)).replace('{companyName}', NOME_DA_EMPRESA);
+        await client.sendText(senderId, confirmationMsg);
+    }
+    
+    carrinhos[senderId] = { items: [], total: 0 };
+    await savePersistentCart(senderId);
+    
+    if (!isPaymentEnabled) {
+        const rows = [
+            { rowId: 'save_order_yes', title: botMessages.list_option_save_order_yes },
+            { rowId: 'save_order_no', title: botMessages.list_option_save_order_no }
+        ];
+        await client.sendListMessage(senderId, { buttonText: botMessages.button_save, title: botMessages.save_order_prompt, sections: [{ rows }] });
+    }
 }

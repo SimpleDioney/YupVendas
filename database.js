@@ -48,7 +48,8 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customerPhone TEXT,
             totalValue REAL,
-            createdAt DATETIME
+            createdAt DATETIME,
+            paymentId TEXT 
         )`);
 
         db.run(`CREATE TABLE IF NOT EXISTS order_items (
@@ -85,8 +86,7 @@ function initializeDatabase() {
             key TEXT PRIMARY KEY,
             value TEXT
         )`);
-
-        // Tabela para HISTÓRICO DE CHAT
+        
         db.run(`CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customerPhone TEXT,
@@ -95,20 +95,34 @@ function initializeDatabase() {
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
-        // Tabela para TEXTOS CUSTOMIZÁVEIS DO BOT
         db.run(`CREATE TABLE IF NOT EXISTS bot_messages (
             key TEXT PRIMARY KEY,
             content TEXT NOT NULL
         )`);
+
+        // CORREÇÃO: Usando db.all para garantir que 'columns' seja um array.
+        db.all("PRAGMA table_info(orders)", (err, columns) => {
+            if (err) {
+                console.error("Erro ao verificar a estrutura da tabela 'orders':", err);
+                return;
+            }
+            if (columns && !columns.find(c => c.name === 'paymentId')) {
+                db.run("ALTER TABLE orders ADD COLUMN paymentId TEXT", (alterErr) => {
+                    if (alterErr) console.error("Erro ao adicionar coluna 'paymentId':", alterErr);
+                });
+            }
+        });
 
         console.log('Estrutura das tabelas verificada.');
 
         // Seeding (dados iniciais)
         try {
             await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('adminPhone', '5511999999999')");
-            await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('minOrderValue', '50')");
-
+            await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('minOrderValue', '0')");
             await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('registration_required', 'true')");
+            await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('payment_mercado_pago_enabled', 'false')");
+            await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('payment_mercado_pago_token', '')");
+
 
             const adminUser = await dbGet('SELECT * FROM users WHERE role = ?', ['admin']);
             if (!adminUser) {
@@ -123,7 +137,6 @@ function initializeDatabase() {
     });
 }
 
-// Funções de Promise para o DB (dbRun, dbGet, dbAll)
 function dbRun(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function (err) {
