@@ -69,21 +69,46 @@ async function start(client, io) {
         if (!message.from || message.isStatus || message.isGroupMsg || message.fromMe) return;
 
         const senderId = message.from;
-        const configAdmin = await dbGet(`SELECT value FROM config WHERE key = 'adminPhone'`);
-        const isAdmin = senderId.includes(configAdmin.value);
+
+        // Pega todas as configurações de uma vez para otimizar
+        const configRows = await dbAll(`SELECT key, value FROM config`);
+        const settings = configRows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
+        
+        const adminPhoneFull = settings.adminPhone + '@c.us';
+        const isAdmin = senderId === adminPhoneFull;
+        const registrationRequired = settings.registration_required === 'true';
 
         if (isAdmin) {
             await handleAdminLogic(client, message);
             return;
         }
 
-        const customer = await dbGet(`SELECT * FROM customers WHERE phone = ?`, [senderId]);
+        let customer = await dbGet(`SELECT * FROM customers WHERE phone = ?`, [senderId]);
+
         if (!customer) {
-            const warningMsg = (botMessages.unregistered_user_warning || "Aviso: O número {senderId} tentou usar o bot, mas não está cadastrado.").replace('{senderId}', senderId.replace('@c.us', ''));
-            await client.sendText(configAdmin.value + '@c.us', warningMsg);
-            return;
+            if (registrationRequired) {
+                // Comportamento ANTIGO: Se o cadastro é exigido, avisa o admin e para.
+                const warningMsg = (botMessages.unregistered_user_warning || "Aviso: O número {senderId} tentou usar o bot, mas não está cadastrado.").replace('{senderId}', senderId.replace('@c.us', ''));
+                await client.sendText(adminPhoneFull, warningMsg);
+                return;
+            } else {
+                // Comportamento NOVO: Se o cadastro NÃO é exigido, cadastra o cliente automaticamente.
+                const customerName = message.sender.pushname || senderId.replace('@c.us', '');
+                try {
+                    await dbRun(`INSERT INTO customers (phone, name, isHumanMode) VALUES (?, ?, ?)`, [senderId, customerName, false]);
+                    // Busca o cliente recém-criado para continuar o fluxo normalmente
+                    customer = await dbGet(`SELECT * FROM customers WHERE phone = ?`, [senderId]);
+                    // Notifica o admin sobre o novo cliente auto-cadastrado
+                    await client.sendText(adminPhoneFull, `✅ Novo cliente auto-cadastrado: *${customerName}* (${senderId.replace('@c.us', '')})`);
+                } catch (error) {
+                    console.error("Erro ao auto-cadastrar novo cliente:", error);
+                    await client.sendText(senderId, botMessages.generic_error);
+                    return;
+                }
+            }
         }
 
+        // A partir daqui, o fluxo continua normalmente, pois o 'customer' sempre existirá.
         await handleCustomerLogic(client, message, customer, io);
     });
 }

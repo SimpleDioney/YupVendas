@@ -125,10 +125,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 4. FUNÇÕES DE CARREGAMENTO DE DADOS (API)
+    async function loadConfig() {
+        if (loggedInUser.role !== 'admin') return;
+        try {
+            const response = await authFetch('/api/config');
+            const config = await response.json();
+            
+            const toggle = document.getElementById('registration-required-toggle');
+            if (toggle) {
+                toggle.checked = (config.registration_required === 'true');
+            }
+        } catch (error) {
+            console.error('Erro ao carregar configurações:', error);
+        }
+    }
+
     async function loadAllData() {
         const promises = [loadStats(), loadProducts(), loadOrders(), loadCustomers()];
         if (loggedInUser.role === 'admin') {
-            promises.push(loadReports(), loadUsers(), setupMessagesForm(), setupCampaignTemplates());;
+            promises.push(loadReports(), loadUsers(), setupMessagesForm(), setupCampaignTemplates(), loadConfig()); // Adicione loadConfig() aqui
         }
         await Promise.all(promises);
     }
@@ -463,6 +478,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadUsers();
         } catch (error) { showToast(`Erro ao salvar usuário: ${error.message}`, 'Erro', true); }
     });
+
+    const registrationToggle = document.getElementById('registration-required-toggle');
+    if (registrationToggle) {
+        registrationToggle.addEventListener('change', async (e) => {
+            const isRequired = e.target.checked;
+            try {
+                await authFetch(`/api/config/registration`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ registration_required: isRequired })
+                });
+                showToast(`Modo de acesso alterado.`, 'Sucesso');
+            } catch (error) {
+                showToast(`Erro ao alterar modo de acesso: ${error.message}`, 'Erro', true);
+                e.target.checked = !isRequired; // Reverte o toggle em caso de erro
+            }
+        });
+    }
 
     document.getElementById('send-message-form').addEventListener('submit', async (e) => {
         e.preventDefault();

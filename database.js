@@ -108,6 +108,8 @@ function initializeDatabase() {
             await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('adminPhone', '5511999999999')");
             await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('minOrderValue', '50')");
 
+            await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('registration_required', 'true')");
+
             const adminUser = await dbGet('SELECT * FROM users WHERE role = ?', ['admin']);
             if (!adminUser) {
                 const salt = await bcrypt.genSalt(10);

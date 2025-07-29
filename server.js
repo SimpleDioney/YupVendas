@@ -66,6 +66,37 @@ function initializeWebServer(wppClient, loadBotMessagesCallback) {
         await dbRun('INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)', [username, hashedPassword, name, role]);
         res.status(201).json({ success: true });
     });
+     app.put('/api/users/:id', authorizeAdmin, async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { name, username, role, password } = req.body;
+
+            // Base da query e parâmetros
+            let query = 'UPDATE users SET name = ?, username = ?, role = ?';
+            const params = [name, username, role];
+
+            // Se uma nova senha foi fornecida, hasheia e adiciona na query
+            if (password) {
+                const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
+                query += ', password = ?';
+                params.push(hashedPassword);
+            }
+
+            // Finaliza a query e adiciona os parâmetros
+            query += ' WHERE id = ?';
+            params.push(id);
+
+            await dbRun(query, params);
+            res.json({ success: true, message: 'Usuário atualizado com sucesso!' });
+
+        } catch (error) {
+            console.error("Erro ao atualizar usuário:", error);
+            if (error.code === 'SQLITE_CONSTRAINT') {
+                return res.status(409).json({ message: 'Este nome de usuário já está em uso.' });
+            }
+            res.status(500).json({ message: "Erro interno no servidor." });
+        }
+    });
     
     app.get('/api/chat/:phone', async (req, res) => res.json(await dbAll(`SELECT * FROM messages WHERE customerPhone = ? ORDER BY timestamp ASC`, [decodeURIComponent(req.params.phone)])));
     app.post('/api/send-message', async (req, res) => {
@@ -133,6 +164,23 @@ function initializeWebServer(wppClient, loadBotMessagesCallback) {
             if (loadBotMessagesCallback) loadBotMessagesCallback();
             res.json({ success: true, message: 'Mensagens atualizadas com sucesso!' });
         } catch (err) { res.status(500).json({ message: "Erro ao atualizar mensagens." }); }
+    });
+
+    app.get('/api/config', authorizeAdmin, async (req, res) => {
+        try {
+            const configRows = await dbAll("SELECT key, value FROM config");
+            const config = configRows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
+            res.json(config);
+        } catch (err) {
+            res.status(500).json({ message: "Erro ao buscar configurações." });
+        }
+    });
+
+    app.put('/api/config/registration', authorizeAdmin, async (req, res) => {
+        const { registration_required } = req.body;
+        // Salva como string 'true' ou 'false' para consistência no DB
+        await dbRun(`UPDATE config SET value = ? WHERE key = 'registration_required'`, [String(registration_required)]);
+        res.json({ success: true, message: 'Modo de registro atualizado!' });
     });
 
     app.get('/api/dashboard-stats', async (req, res) => {
